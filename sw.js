@@ -1,90 +1,50 @@
-// sw.js - Service Worker for Push Notifications
-// Save this file as 'sw.js' in the same directory as your HTML file
+// firebase-messaging-sw.js
+importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
 
-self.addEventListener('install', function (event) {
-    console.log('Service Worker: Installing...');
-    self.skipWaiting();
+firebase.initializeApp({
+    apiKey: "AIzaSyBAcd8XMjlzeuWLkWYWZrn4SOWMiKN-qFE",
+    authDomain: "with-code-example.firebaseapp.com",
+    projectId: "with-code-example",
+    messagingSenderId: "922329790485",
+    appId: "1:922329790485:web:f67575d3951b5ef109761c"
 });
 
-self.addEventListener('activate', function (event) {
-    console.log('Service Worker: Activating...');
-    event.waitUntil(self.clients.claim());
-});
+const messaging = firebase.messaging();
 
-self.addEventListener('push', function (event) {
-    console.log('Push event received:', event);
-
-    let data = {};
-    if (event.data) {
-        try {
-            data = event.data.json();
-        } catch (e) {
-            data = { title: 'New Notification', body: event.data.text() };
-        }
-    }
-
-    const title = data.title || 'New Notification';
-    const options = {
-        body: data.body || 'You have a new message!',
-        icon: data.icon || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMzIiIGZpbGw9IiM2NjdlZWEiLz4KPHBhdGggZD0iTTMyIDEwVjU0TTEwIDMySDU0IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K',
-        badge: data.badge || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMzIiIGZpbGw9IiM2NjdlZWEiLz4KPC9zdmc+',
-        tag: data.tag || 'notification-' + Date.now(),
-        requireInteraction: data.requireInteraction || false,
-        actions: data.actions || [],
-        data: data.data || { url: '/' },
-        vibrate: data.vibrate || [200, 100, 200],
-        timestamp: Date.now(),
-        silent: data.silent || false
+// 🔽 Show custom notification in background
+messaging.onBackgroundMessage(function (payload) {
+    console.log("Background message received: ", payload);
+    const notificationTitle = payload.data.title;
+    const notificationOptions = {
+        body: payload.data.body,
+        icon: payload.data.icon || "https://withcodeexample.com/content/images/size/w256h256/2025/05/wce-logo-512-1.png",
+        data: {
+            url: payload.data.url || "https://withcodeexample.com"
+        },
     };
 
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
+    self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-self.addEventListener('notificationclick', function (event) {
-    console.log('Notification clicked:', event);
-    event.notification.close();
-
-    const clickAction = event.action;
-    const notificationData = event.notification.data || {};
-    const url = notificationData.url || '/';
+// 🖱️ Click event handler
+self.addEventListener("notificationclick", function (event) {
+    event.notification.close(); // Close the notification
+    console.log(event.notification)
+    const targetUrl = event.notification.data.url;
 
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
-            // Check if there's already a window/tab open with the target URL
-            for (let i = 0; i < clientList.length; i++) {
-                const client = clientList[i];
-                if (client.url === url && 'focus' in client) {
+        clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+            for (const client of clientList) {
+                // If the site is already open, focus it
+                if (client.url === targetUrl && "focus" in client) {
                     return client.focus();
                 }
             }
-
-            // If no existing window/tab, open a new one
+            // Otherwise, open a new tab
             if (clients.openWindow) {
-                return clients.openWindow(url);
+                return clients.openWindow(targetUrl);
             }
         })
     );
 });
-
-self.addEventListener('notificationclose', function (event) {
-    console.log('Notification closed:', event);
-    // You can track notification close events here
-});
-
-// Handle background sync (optional)
-self.addEventListener('sync', function (event) {
-    console.log('Background sync:', event);
-    if (event.tag === 'background-sync') {
-        event.waitUntil(doBackgroundSync());
-    }
-});
-
-function doBackgroundSync() {
-    // Perform background sync operations
-    return fetch('/api/sync')
-        .then(response => response.json())
-        .then(data => console.log('Background sync completed:', data))
-        .catch(err => console.error('Background sync failed:', err));
-}
